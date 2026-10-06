@@ -409,6 +409,14 @@ const commandLineArguments: string[] = [];
 
 const appBase = {
   ...createEmitterStub("app"),
+  dock: {
+    setIcon(icon: unknown): void {
+      log("app.dock.setIcon", [icon]);
+    },
+    setMenu(menu: unknown): void {
+      log("app.dock.setMenu", [menu]);
+    },
+  },
   name: "Codex",
   isPackaged: false,
   getName(): string {

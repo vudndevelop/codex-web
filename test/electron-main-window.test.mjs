@@ -5,6 +5,12 @@ import test from "node:test";
 const require = createRequire(import.meta.url);
 const { BrowserWindow } = require("../src/server/electron/index.js");
 
+test("macOS Desktop startup can reset the Dock icon and menu", () => {
+  const { app } = require("../src/server/electron/index.js");
+  assert.doesNotThrow(() => Reflect.apply(app.dock.setIcon.bind(app.dock), app.dock, [null]));
+  assert.doesNotThrow(() => app.dock.setMenu(null));
+});
+
 test("only the first live BrowserWindow broadcasts renderer events", () => {
   BrowserWindow.allWindows = [];
   BrowserWindow.focusedWindow = null;

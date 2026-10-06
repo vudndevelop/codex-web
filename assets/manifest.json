@@ -1,5 +1,5 @@
 {
-  "short_name": "Codex",
+  "short_name": "Mac",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
@@ -19,5 +19,6 @@
       "type": "image/png",
       "purpose": "any maskable"
     }
-  ]
+  ],
+  "name": "Mac"
 }
