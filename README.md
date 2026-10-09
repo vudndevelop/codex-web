@@ -2,11 +2,37 @@
 
 a browser frontend for codex desktop, running on a machine you control.
 
-This is the maintained [maolei1024 fork](https://github.com/maolei1024/codex-web)
-of [0xcaff/codex-web](https://github.com/0xcaff/codex-web). It includes token and
+This is the [vudndevelop fork](https://github.com/vudndevelop/codex-web) of
+[maolei1024/codex-web](https://github.com/maolei1024/codex-web), based on
+[0xcaff/codex-web](https://github.com/0xcaff/codex-web). It includes token and
 cookie authentication, bounded uploads, browser downloads, mobile layout and
 reconnection improvements, and compressed, versioned assets. The Desktop bundle
 is pinned to `26.930.21537`; the host supplies the Codex CLI.
+
+Experimental writer recovery attempts native owner discovery and waits up to
+five seconds for that owner's follower snapshot. Authentication and single-writer
+locks remain. Live native-owned task access has not passed acceptance testing;
+missing or incompatible owners retain the original resume error.
+`scripts/patch-thread-writer-recovery.mjs` patches compatible extracted bundles,
+without modifying or re-signing an installed app. New web tasks are not
+automatically routed to the native desktop.
+
+## Updating this fork
+
+`origin` points to `vudndevelop/codex-web`; `upstream` points to
+`maolei1024/codex-web`. Keep local changes committed before merging updates:
+
+```sh
+git switch main
+git fetch upstream
+git merge upstream/main
+npm test
+git push origin main
+```
+
+Resolve any merge conflicts while preserving local behavior, then commit the
+resolution and run tests before pushing. Source sync does not restart or upgrade
+the running service. Updates are merged on demand, not deployed automatically.
 
 Use one source checkout. User projects belong in `~/ChatGPT`, and credentials
 belong in the service environment outside Git. `CODEX_WEB_DOCUMENTS_DIR` can
@@ -382,6 +408,7 @@ someone with access to the web ui may be able to:
   - inline images
   - editor sidepanel
   - transcription
+  - integrated terminal and local agent input/output ([setup](docs/shared-terminal.md))
 
 ## roadmap
 
@@ -389,7 +416,6 @@ some parts of the desktop experience are not wired up yet:
 
 - browser panel support, likely rebuilt around iframes
 - computer use on linux, which could become a very powerful feature
-- terminal support
 - git worker integration
 - whatever else people find and file issues for
 

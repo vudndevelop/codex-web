@@ -32,4 +32,10 @@ fi
 for desktop_patch in patches/*.patch; do
   patch --batch --forward --fuzz=0 --strip 1 --directory scratch/asar < "$desktop_patch"
 done
+node scripts/patch-thread-writer-recovery.mjs scratch/asar/.vite/build/bootstrap-yYZ8rgHq.js scratch/asar/.vite/build/bootstrap-yYZ8rgHq.js
+node scripts/patch-thread-writer-recovery.mjs scratch/asar/webview/assets/app-shared-59042e7300f7.js scratch/asar/webview/assets/app-shared-59042e7300f7.js --browser
 rm -rf scratch/asar/node_modules/better-sqlite3
+
+if [[ -f scratch/asar/node_modules/node-pty/build/Release/spawn-helper ]]; then
+  chmod u+x scratch/asar/node_modules/node-pty/build/Release/spawn-helper
+fi

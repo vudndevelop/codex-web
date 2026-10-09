@@ -6,6 +6,7 @@
     "README.md",
     "scratch/asar/**/*",
     "src/server/**/*.js",
+    "src/server/**/*.cjs",
     "src/server/electron/index.js",
     "!**/*.ts"
   ],

@@ -1,0 +1,10 @@
+--- a/.vite/build/main-C3nRcJ3D.js
++++ b/.vite/build/main-C3nRcJ3D.js
+@@ -153381,6 +153381,7 @@
+           (e) => this.appServerConnectionRegistry.getMaybeConnection(e),
+           j,
+         )),
++        ((globalThis.__codexWebTerminalManagers ??= new Set()).add(this.terminalManager)),
+         (this.remoteConnectionsHandler = new tWe(
+           this.appState,
+           this.sharedObjectRepository,

@@ -19,3 +19,7 @@ uploads/
 .env.*
 !.env.example
 .ci/digests/
+
+# Native runtime identity and updater cache.
+.codex-tpp-local-executor-installation-id
+com.openai.codex/

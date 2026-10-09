@@ -19,6 +19,7 @@ import fastifyStatic from "@fastify/static";
 import { installModuleAliasHook } from "./module";
 import { startupRecovery } from "./startup-recovery";
 import { glob } from "glob";
+import { startTerminalBridge, type TerminalManager } from "./terminal-bridge";
 import {
   assertTokenRequirement,
   installAuthHook,
@@ -1238,6 +1239,18 @@ export async function startIpcBridgeServer(
   }
 
   const module = require(matches[0]!);
+  const spawnHelper = path.resolve(__dirname, "../../scratch/asar/node_modules/node-pty/build/Release/spawn-helper");
+  if (process.platform === "darwin") {
+    const stat = await fs.stat(spawnHelper);
+    await fs.chmod(spawnHelper, stat.mode | 0o100);
+  }
+  await startTerminalBridge(options.port, () => {
+    const managers = (globalThis as typeof globalThis & {
+      __codexWebTerminalManagers?: Set<TerminalManager>;
+    }).__codexWebTerminalManagers;
+    if (!managers) return undefined;
+    return [...managers];
+  });
   module.runMainAppStartup();
   return app;
 }
