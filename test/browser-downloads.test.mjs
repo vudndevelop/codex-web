@@ -216,6 +216,153 @@ test("service wrapper does not enumerate RPC proxies and retains other receivers
   );
 });
 
+async function withBrowserGlobals({ navigator, document }, callback) {
+  const hadNavigator = Object.hasOwn(globalThis, "navigator");
+  const hadDocument = Object.hasOwn(globalThis, "document");
+  const originalNavigator = globalThis.navigator;
+  const originalDocument = globalThis.document;
+  Object.defineProperty(globalThis, "navigator", {
+    configurable: true,
+    value: navigator,
+  });
+  Object.defineProperty(globalThis, "document", {
+    configurable: true,
+    value: document,
+  });
+  try {
+    return await callback();
+  } finally {
+    if (hadNavigator) {
+      Object.defineProperty(globalThis, "navigator", {
+        configurable: true,
+        value: originalNavigator,
+      });
+    } else {
+      delete globalThis.navigator;
+    }
+    if (hadDocument) {
+      Object.defineProperty(globalThis, "document", {
+        configurable: true,
+        value: originalDocument,
+      });
+    } else {
+      delete globalThis.document;
+    }
+  }
+}
+
+function fakeDocument(execCommand) {
+  const events = [];
+  let textarea;
+  const document = {
+    body: {
+      append(node) {
+        textarea = node;
+        events.push(["append", node]);
+      },
+    },
+    createElement(tag) {
+      assert.equal(tag, "textarea");
+      return {
+        style: {},
+        value: "",
+        focus() {
+          events.push(["focus"]);
+        },
+        select() {
+          events.push(["select"]);
+        },
+        remove() {
+          events.push(["remove"]);
+        },
+      };
+    },
+    execCommand(command) {
+      return execCommand(command, textarea, events);
+    },
+  };
+  return { document, events };
+}
+
+test("clipboard service writes through the browser and preserves other methods", async () => {
+  const writes = [];
+  let nativeWriteCalled = false;
+  const clipboard = {
+    writeText() {
+      nativeWriteCalled = true;
+    },
+    marker: 42,
+    readMarker() {
+      assert.equal(this, clipboard);
+      return this.marker;
+    },
+  };
+  const wrapped = wrapBrowserServices({ clipboard });
+  await withBrowserGlobals(
+    { navigator: { clipboard: { writeText: async (text) => writes.push(text) } }, document: undefined },
+    async () => {
+      assert.equal(wrapped.clipboard, wrapped.clipboard);
+      assert.equal(wrapped.clipboard.marker, 42);
+      assert.equal(wrapped.clipboard.readMarker(), 42);
+      assert.equal(wrapped.clipboard.readMarker, wrapped.clipboard.readMarker);
+      await wrapped.clipboard.writeText("浏览器剪贴板");
+    },
+  );
+  assert.deepEqual(writes, ["浏览器剪贴板"]);
+  assert.equal(nativeWriteCalled, false);
+});
+
+test("clipboard service falls back to a selected textarea when the Clipboard API fails", async () => {
+  const { document, events } = fakeDocument((command, textarea) => {
+    assert.equal(command, "copy");
+    assert.equal(textarea.value, "fallback text");
+    return true;
+  });
+  const wrapped = wrapBrowserServices({ clipboard: {} });
+  await withBrowserGlobals(
+    {
+      navigator: {
+        clipboard: {
+          writeText: async () => {
+            throw new Error("permission denied");
+          },
+        },
+      },
+      document,
+    },
+    () => wrapped.clipboard.writeText("fallback text"),
+  );
+  assert.deepEqual(events.map(([type]) => type), [
+    "append",
+    "focus",
+    "select",
+    "remove",
+  ]);
+});
+
+test("clipboard service rejects when both browser copy paths fail", async () => {
+  const { document } = fakeDocument(() => false);
+  const wrapped = wrapBrowserServices({ clipboard: {} });
+  await withBrowserGlobals(
+    {
+      navigator: {
+        clipboard: {
+          writeText: async () => {
+            throw new Error("permission denied");
+          },
+        },
+      },
+      document,
+    },
+    async () => {
+      await assert.rejects(
+        wrapped.clipboard.writeText("cannot copy"),
+        /permission denied/,
+      );
+    },
+  );
+});
+
 test("built Desktop service initialization and artifact analytics use browser adapter", async () => {
   const initial = await readFile(
     "scratch/asar/webview/assets/app-shared-59042e7300f7.js",

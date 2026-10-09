@@ -98,6 +98,43 @@ function copyBytes(value: unknown): Uint8Array<ArrayBuffer> {
   throw new Error("下载内容无效 / Invalid download bytes");
 }
 
+/** Write plain text in the user's browser instead of the server-side Electron host. */
+async function writeBrowserClipboard(text: string): Promise<void> {
+  let clipboardError: unknown;
+  const clipboard = globalThis.navigator?.clipboard;
+  if (typeof clipboard?.writeText === "function") {
+    try {
+      await clipboard.writeText(text);
+      return;
+    } catch (error) {
+      clipboardError = error;
+    }
+  }
+
+  const document = globalThis.document;
+  if (document?.body && typeof document.execCommand === "function") {
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.style.position = "fixed";
+    textarea.style.top = "0";
+    textarea.style.left = "0";
+    textarea.style.opacity = "0";
+    document.body.append(textarea);
+    try {
+      textarea.focus();
+      textarea.select();
+      if (document.execCommand("copy")) return;
+    } catch (error) {
+      clipboardError ??= error;
+    } finally {
+      textarea.remove();
+    }
+  }
+
+  if (clipboardError !== undefined) throw clipboardError;
+  throw new Error("Browser clipboard API unavailable");
+}
+
 export async function saveBrowserCopy(
   input: BrowserSaveCopyInput,
   environment?: DownloadEnvironment,
@@ -156,26 +193,43 @@ export async function saveBrowserCopy(
 
 /** Do not enumerate/spread RPC proxies; preserve lazy properties and receivers. */
 export function wrapBrowserServices<T extends object>(services: T): T {
-  const workspaceWrappers = new WeakMap<object, object>();
-  function wrap<S extends object>(target: S, workspace: boolean): S {
+  const nestedWrappers = new WeakMap<object, object>();
+  type ServiceKind = "root" | "workspace" | "clipboard";
+  function wrap<S extends object>(target: S, kind: ServiceKind): S {
     const bound = new Map<
       PropertyKey,
       { original: Function; bound: Function }
     >();
     return new Proxy(target, {
       get(original, property) {
-        if (workspace && property === "saveCopy") return saveBrowserCopy;
+        if (kind === "workspace" && property === "saveCopy")
+          return saveBrowserCopy;
+        if (kind === "clipboard" && property === "writeText")
+          return writeBrowserClipboard;
         const value = Reflect.get(original, property, original);
         if (
-          !workspace &&
+          kind === "root" &&
           property === "workspaceFiles" &&
           value != null &&
           (typeof value === "object" || typeof value === "function")
         ) {
-          let wrapped = workspaceWrappers.get(value);
+          let wrapped = nestedWrappers.get(value);
           if (!wrapped) {
-            wrapped = wrap(value, true);
-            workspaceWrappers.set(value, wrapped);
+            wrapped = wrap(value, "workspace");
+            nestedWrappers.set(value, wrapped);
+          }
+          return wrapped;
+        }
+        if (
+          kind === "root" &&
+          property === "clipboard" &&
+          value != null &&
+          (typeof value === "object" || typeof value === "function")
+        ) {
+          let wrapped = nestedWrappers.get(value);
+          if (!wrapped) {
+            wrapped = wrap(value, "clipboard");
+            nestedWrappers.set(value, wrapped);
           }
           return wrapped;
         }
@@ -197,5 +251,5 @@ export function wrapBrowserServices<T extends object>(services: T): T {
       },
     });
   }
-  return wrap(services, false);
+  return wrap(services, "root");
 }
